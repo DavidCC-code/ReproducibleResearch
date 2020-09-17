@@ -1,0 +1,135 @@
+---
+title: "Severe weather events impact analysis"
+author: "DCC"
+date: "17/9/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(stringr)
+
+```
+
+## Data Processing
+
+Download data and read csv file into 
+
+```{r }
+#download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2",destfile = "StormData.bz2")
+data <- read.csv("StormData.bz2")
+```
+
+902297 Obs. of 37 varibles
+```{r }
+str(data)
+```
+
+
+
+
+There are 985 event type levels, if we refer to [National Weather Service Instructions](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) section 7 it should be 48. As we can see there are different spellings for same events (eg. "Tstm Wind", "TSM WIND (G45)", "TUNDERSTOR WIND", "THUNDESTORM WINDS"). We will need to homogenize those values and get as close as possible to the 48 event types listed in the documentation. Those event types that don't match to any in the list like (Summaries) will be ignored. 
+
+### Remove Summary rows.
+
+```{r}
+data %>% group_by(EVTYPE) %>% filter(str_detect(EVTYPE, "[Ss]umm") )%>% select(EVTYPE)
+```
+
+As you can see there are 73 rows of data that seem to be summarized and cannot be tied to any of the event types described in the documentation. So we will recreate the data frame ignoring those rows which the variable EVTYPE containing "Summ" or "summ".
+
+```{r}
+data <- data %>% filter(!str_detect(EVTYPE, "[sS]umm"))
+```
+
+
+Once remmoved those the most accurate approach seems to perform some checks for each of the 48 event types.
+
+1. Astronomical Low Tide
+
+
+Check for event types containin characters "astr", "Astr" or "ASTR".
+
+```{r}
+data %>%  filter(str_detect(EVTYPE, "[aA]str")) %>% select(EVTYPE)
+data %>%  filter(str_detect(EVTYPE, "ASTR")) %>% select(EVTYPE)
+```
+
+
+
+```{r}
+astr_low_tide <- data %>%  filter(str_detect(EVTYPE, "ASTR")) %>% select(EVTYPE)
+table(astr_low_tide)
+```
+
+Event type ASTRONAMICAL HIGH TIDE is not described in documentations but as of secitin 7.23 it might be included in High Surf event type. It will be done later on in this document. 
+
+Next searching for charactger "LOW"  or "TIDE" we find a couple observations related to tides that not match any event type (BLOW-OUT TIDES, BLOW-OUT TIDE). We will remove does two as well and keep ASTRONOMICAL LOW TIDE as the right value for this event type.
+
+```{r}
+astr_low_tide <- data %>%  filter(str_detect(EVTYPE, "LOW")) %>% select(EVTYPE)
+table(astr_low_tide)
+```
+
+```{r}
+astr_low_tide <- data %>%  filter(str_detect(EVTYPE, "TIDE")) %>% select(EVTYPE)
+table(astr_low_tide)
+rm(ast_low_tide)
+```
+
+```{r}
+data <- data <-data %>%filter(!str_detect(EVTYPE, "BLOW-OUT"))
+```
+
+
+
+2. Avalanche
+
+```{r}
+data %>%  filter(str_detect(EVTYPE, "[Aa]va")) %>% select(EVTYPE)
+```
+
+```{r}
+avalanche <- data %>%  filter(str_detect(EVTYPE, "AVA")) %>% select(EVTYPE)
+table(avalanche)
+
+```
+
+Modify the two divergent values to fit into the documented event AVALANCHE
+```{r}
+data[str_detect(data$EVTYPE,"AVA"),] <- data %>%filter(str_detect(EVTYPE, "AVA"))%>% mutate(EVTYPE = "AVALANCHE" )
+```
+
+
+```{r}
+avalanche <- data %>%  filter(str_detect(EVTYPE, "AVA")) %>% select(EVTYPE)
+table(avalanche)
+rm(avalanche)
+```
+
+3. Blizzard
+
+```{r}
+data %>%  filter(str_detect(EVTYPE, "[Bb]li")) %>% select(EVTYPE)
+```
+
+
+```{r}
+blizz <-data %>%  filter(str_detect(EVTYPE, "BLI")) %>% select(EVTYPE)
+table(blizz)
+```
+
+
+23. High Surf
+
+ASTRONOMICAL HIGH TIDE 
+
+
+Create new columns with the actual amount of property and crop damage by multiplyng by the manigitude (PROPDMEXP,CROPDMEXP)
+being magnitud K thousands, M millions and B billions as explained in [National Weather Service Instructions](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
+
+
+
+
+## Results
