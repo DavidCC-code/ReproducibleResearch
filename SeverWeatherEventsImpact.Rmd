@@ -27,8 +27,6 @@ str(data)
 ```
 
 
-
-
 There are 985 event type levels, if we refer to [National Weather Service Instructions](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) section 7 it should be 48. As we can see there are different spellings for same events (eg. "Tstm Wind", "TSM WIND (G45)", "TUNDERSTOR WIND", "THUNDESTORM WINDS"). We will need to homogenize those values and get as close as possible to the 48 event types listed in the documentation. Those event types that don't match to any in the list like (Summaries) will be ignored. 
 
 ### Remove Summary rows.
@@ -44,86 +42,267 @@ data <- data %>% filter(!str_detect(EVTYPE, "[sS]umm"))
 ```
 
 
-Once remmoved those the most accurate approach seems to perform some checks for each of the 48 event types.
+### Standarize event types names
+
+Once remmoved those the most accurate approach seems to perform some checks for each of the 48 event types and try to find misspelings, or made up event types and see if we can fit as many of them in the documented event types.
 
 1. Astronomical Low Tide
 
 
-Check for event types containin characters "astr", "Astr" or "ASTR".
+Check for event types using search pattern based on the start word astronomical or tide.
 
 ```{r}
-data %>%  filter(str_detect(EVTYPE, "[aA]str")) %>% select(EVTYPE)
-data %>%  filter(str_detect(EVTYPE, "ASTR")) %>% select(EVTYPE)
+spattern = "[aA]str|ASTR|[Tt]ide|TIDE"
+etypes <- data %>%  filter(str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
+table(etypes)
 ```
 
+Event type ASTRONAMICAL HIGH TIDE is not described in documentations but as of sectoin 7.4 it might be included in Coastal Flood event type. It will be done later on in this document. 
 
-
-```{r}
-astr_low_tide <- data %>%  filter(str_detect(EVTYPE, "ASTR")) %>% select(EVTYPE)
-table(astr_low_tide)
-```
-
-Event type ASTRONAMICAL HIGH TIDE is not described in documentations but as of secitin 7.23 it might be included in High Surf event type. It will be done later on in this document. 
-
-Next searching for charactger "LOW"  or "TIDE" we find a couple observations related to tides that not match any event type (BLOW-OUT TIDES, BLOW-OUT TIDE). We will remove does two as well and keep ASTRONOMICAL LOW TIDE as the right value for this event type.
-
-```{r}
-astr_low_tide <- data %>%  filter(str_detect(EVTYPE, "LOW")) %>% select(EVTYPE)
-table(astr_low_tide)
-```
-
-```{r}
-astr_low_tide <- data %>%  filter(str_detect(EVTYPE, "TIDE")) %>% select(EVTYPE)
-table(astr_low_tide)
-rm(ast_low_tide)
-```
+There's couple observations related to tides that not match any event type described in the documentation (BLOW-OUT TIDES, BLOW-OUT TIDE). We will remove does two as well and keep "ASTRONOMICAL LOW TIDE" as the right value for this event type.
 
 ```{r}
 data <- data <-data %>%filter(!str_detect(EVTYPE, "BLOW-OUT"))
 ```
 
+The other references to ties are associated to other phenomenon like wind or storm, we will later add those obsevations to them.
+
 
 
 2. Avalanche
 
+We will search form characters Ava, ava or AVA to try and find or references to the event avalanche.
+
 ```{r}
-data %>%  filter(str_detect(EVTYPE, "[Aa]va")) %>% select(EVTYPE)
+event = "AVALANCHE"
+spattern = "[Aa]va|AVA"
+etypes <- data %>%  filter(str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
+table(etypes)
 ```
 
-```{r}
-avalanche <- data %>%  filter(str_detect(EVTYPE, "AVA")) %>% select(EVTYPE)
-table(avalanche)
+There are two divergent values that we will update to fit into the documented event avalanche, as EVTYPE = AVALANCHE
 
-```
-
-Modify the two divergent values to fit into the documented event AVALANCHE
 ```{r}
-data[str_detect(data$EVTYPE,"AVA"),] <- data %>%filter(str_detect(EVTYPE, "AVA"))%>% mutate(EVTYPE = "AVALANCHE" )
+data[str_detect(data$EVTYPE,spattern),] <- data %>%filter(str_detect(EVTYPE,spattern))%>% mutate(EVTYPE = event )
 ```
 
 
 ```{r}
-avalanche <- data %>%  filter(str_detect(EVTYPE, "AVA")) %>% select(EVTYPE)
-table(avalanche)
-rm(avalanche)
+etypes <- data %>%  filter(str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
+table(etypes)
 ```
 
 3. Blizzard
 
+Search for event types containing Bli, bli and BLI to be included in event type "BLIZZARD"
+
 ```{r}
-data %>%  filter(str_detect(EVTYPE, "[Bb]li")) %>% select(EVTYPE)
+event = "BLIZZARD"
+spattern="[Bb]li|BLI"
+etypes <- data %>%  filter(str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
+table(etypes)
+```
+
+
+In this case all event types containing the word blizzard, I think, can be assimilated to blizzard, for example HIGH WIND/ BLIZZARD it seems that the event it would describe its a blizzard because it includes winds, the same occurs with  WIND CHILl  or WINTER STORM. 
+
+So we will convert all of them to BLIZZARD.
+
+```{r}
+data[str_detect(data$EVTYPE,spattern),] <- data %>%filter(str_detect(EVTYPE, spattern))%>% mutate(EVTYPE = event )
+etypes <-data %>%  filter(str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
+table(etypes)
+```
+
+4. Coastal Flood
+
+
+Search for event types based on words coast and flood and include results in event "COASTAL FLOOD".
+
+```{r}
+event="COASTAL FLOOD"
+spattern ="[Cc]oast|COAST"
+spattern2 = "[fF]lood|FLOOD"
+etypes <- data %>%  filter(str_detect(EVTYPE, spattern)& str_detect(EVTYPE, spattern2)) %>% select(EVTYPE)
+table(etypes)
+
+```
+
+We will include all except Coastal Strom which we will add later to STORM TIDE. 
+New search patter will be based on coastal flood.
+
+```{r}
+data[str_detect(data$EVTYPE, spattern)& str_detect(data$EVTYPE, spattern2) ,] <- data %>%filter( str_detect(EVTYPE, spattern)& str_detect(EVTYPE, spattern2))  %>% mutate(EVTYPE = event )
+etypes<- data %>%  filter( str_detect(EVTYPE, spattern)& str_detect(EVTYPE, spattern2)) %>% select(EVTYPE)
+table(etypes)
+```
+
+To make sure we will check for the word coastal only.
+
+```{r}
+etypes<- data %>%  filter(  str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
+table(etypes)
+```
+
+
+We will also add "COASTAL EROSION" and "COASTAL SURGE".
+
+```{r}
+data[data$EVTYPE== "COASTAL EROSION"|data$EVTYPE == "COASTAL SURGE" ,] <- data %>%filter( EVTYPE== "COASTAL EROSION"|EVTYPE == "COASTAL SURGE")  %>% mutate(EVTYPE = event )
+etypes<- data %>%  filter(  str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
+table(etypes)
+```
+
+
+Also we already know that we need to include in this event type "ASTRONOMICAL HIGH TIDE".
+
+
+```{r}
+data[data$EVTYPE=="ASTRONOMICAL HIGH TIDE" ,] <- data %>%filter( EVTYPE=="ASTRONOMICAL HIGH TIDE")  %>% mutate(EVTYPE =event)
+etypes <- data %>%  filter(str_detect(EVTYPE, spattern)& str_detect(EVTYPE, spattern2)) %>% select(EVTYPE)
+table(etypes)
+```
+
+5. Cold / Wind Chill
+
+Event type "COLD"
+Search for Chill, chill, CHILL, cold, Cold and COLD 
+
+```{r}
+event = "COLD"
+spattern =  "[Cc]old|COLD|[cC]hill|CHILL"
+etypes <- data %>%  filter(str_detect(EVTYPE,spattern)) %>% select(EVTYPE)
+table(etypes)
+```
+
+We will include all matchings in COLD event type.
+
+```{r}
+data[str_detect(data$EVTYPE, spattern) ,] <- data %>%filter( str_detect(EVTYPE, spattern))  %>% mutate(EVTYPE =event )
+etypes <- data %>%  filter(str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
+table(etypes)
+```
+
+6. Debris Flow
+
+The search patterns are based on the words debris, lahar, mud (for mudfall) and volcanic. As stated in the documentation "In most cases, lahars or mudflowsfrom volcanic activity are considered a debris flow."
+
+```{r}
+event="DEBRIS FLOW"
+spattern ="[Dd]ebris|DEBRIS|[Ll]ahar|LAHAR|[Mm]ud|MUD|[Vv]olcanic|VOLCANIC"
+etypes <- data %>%  filter(str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
+table(etypes)
+```
+
+We will exclude all volcanic related observations from this event type, they all will be included in VOLCANIC ASH.
+
+```{r}
+spattern ="[Dd]ebris|DEBRIS|[Ll]ahar|LAHAR|[Mm]ud|MUD"
+data[str_detect(data$EVTYPE, spattern) ,] <- data %>%filter( str_detect(EVTYPE, spattern))  %>% mutate(EVTYPE =event )
+etypes <- data %>%filter( str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
+table(etypes)
+```
+
+7. Dense Fog
+
+
+```{r}
+event ="DENSE FOG"
+spattern = "[Ff]og|FOG"
+etypes <- data %>%  filter(str_detect(EVTYPE,spattern))%>% select(EVTYPE)
+table(etypes)
+```
+
+After search based on word fog event types "FOG" and "PATCHY DENSE FOG" will be included in "DENSE FOG", the rest belong to "FREEZING FOG" and will be standarized later.
+
+
+```{r}
+spattern="DENSE FOG|^FOG"
+etypes <- data %>%  filter(str_detect(EVTYPE,spattern ))%>% select(EVTYPE)
+table(etypes)
+```
+
+```{r}
+data[str_detect(data$EVTYPE, spattern) ,] <- data %>%filter( str_detect(EVTYPE, spattern))  %>% mutate(EVTYPE =event )
+etypes <- data %>%filter( str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
+table(etypes)
+```
+
+8. Dense Smoke
+
+Event types including word smoke, as usual lowercase and uppercase.
+
+```{r}
+event ="DENSE SMOKE"
+spattern ="[Ss]moke|SMOKE"
+etypes <- data %>%  filter(str_detect(EVTYPE,spattern ))%>% select(EVTYPE)
+table(etypes)
+```
+
+```{r}
+data[str_detect(data$EVTYPE, spattern) ,] <- data %>%filter( str_detect(EVTYPE,spattern))  %>% mutate(EVTYPE =event )
+etypes <- data %>%filter( str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
+table(etypes)
+```
+
+9. Drought
+
+
+```{r}
+event="DROUGHT"
+spattern = "[dD]rought|DROUGHT"
+etypes <- data %>%  filter(str_detect(EVTYPE, spattern ))%>% select(EVTYPE)
+table(etypes)
+```
+
+All event types with word drought are corsidered "DROUGHT" event type.
+
+
+```{r}
+data[str_detect(data$EVTYPE, spattern) ,] <- data %>%filter( str_detect(EVTYPE,spattern))  %>% mutate(EVTYPE =event )
+etypes <- data %>%filter( str_detect(EVTYPE,spattern)) %>% select(EVTYPE)
+table(etypes)
+```
+
+10. Dust Devil
+
+```{r}
+event ="DUST DEVIL"
+spattern = "[dD]ust|DUST|[Dd]evil|DEVIL"
+etypes <- data %>%  filter(str_detect(EVTYPE, spattern))%>% select(EVTYPE)
+table(etypes)
+```
+
+As shown by search based on words dust and devil we will keep as "DUST DEVIL" only those including the word devil and devel, the rest seem to belong to "DUST STORM" event type.
+
+
+```{r}
+spattern= "[Dd]evil|DEV[IE]L"
+etypes <- data %>%  filter(str_detect(EVTYPE, spattern))%>% select(EVTYPE)
+table(etypes)
 ```
 
 
 ```{r}
-blizz <-data %>%  filter(str_detect(EVTYPE, "BLI")) %>% select(EVTYPE)
-table(blizz)
+data[str_detect(data$EVTYPE, spattern) ,] <- data %>%filter( str_detect(EVTYPE, spattern))  %>% mutate(EVTYPE =event)
+etypes <- data %>%filter( str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
+table(etypes)
 ```
 
+11. Dust Storm
+
+All event types including the word dust, except those including word devil.
+
+```{r}
+event = "DUST STORM"
+spattern =  "[dD]ust|DUST"
+etypes <- data %>%  filter(str_detect(EVTYPE, spattern))%>% select(EVTYPE)
+table(etypes)
+```
 
 23. High Surf
 
-ASTRONOMICAL HIGH TIDE 
+
 
 
 Create new columns with the actual amount of property and crop damage by multiplyng by the manigitude (PROPDMEXP,CROPDMEXP)
