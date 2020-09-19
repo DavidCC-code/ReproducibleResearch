@@ -14,20 +14,28 @@ library(stringr)
 
 ## Data Processing
 
-Download data and read csv file into 
+Download storm data and read csv file into data frame "data".
 
 ```{r }
 #download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2",destfile = "StormData.bz2")
-data <- read.csv("StormData.bz2")
+#data <- read.csv("StormData.bz2")
 ```
 
-902297 Obs. of 37 varibles
+There are 902297 Obs. of 37 varibles.
 ```{r }
 str(data)
 ```
+The first variable that interest us for the analysis is "EVTYPE" which contains the event type, value that we will need to determine the which meteorological phenomenon has more impact on population and properties. 
 
+```{r}
+n_distinct(data$EVTYPE, na.rm=FALSE)
+```
 
-There are 985 event type levels, if we refer to [National Weather Service Instructions](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) section 7 it should be 48. As we can see there are different spellings for same events (eg. "Tstm Wind", "TSM WIND (G45)", "TUNDERSTOR WIND", "THUNDESTORM WINDS"). We will need to homogenize those values and get as close as possible to the 48 event types listed in the documentation. Those event types that don't match to any in the list like (Summaries) will be ignored. 
+```{r}
+unique(data$EVTYPE)
+```
+
+There are 985 event type levels, if we refer to [National Weather Service Instructions](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) section 7 it should be 48. As we can see there are different spellings for same events (eg. "Tstm Wind", "TSM WIND (G45)", "TUNDERSTOR WIND", "THUNDESTORM WINDS"). We will need to homogenize those values and get as close as possible to the 48 event types listed in the documentation. Those event types that don't match to any in the list like ("Summaries") will be ignored. 
 
 ### Remove Summary rows.
 
@@ -44,17 +52,21 @@ data <- data %>% filter(!str_detect(EVTYPE, "[sS]umm"))
 
 ### Standarize event types names
 
-Once remmoved those the most accurate approach seems to perform some checks for each of the 48 event types and try to find misspelings, or made up event types and see if we can fit as many of them in the documented event types.
+Following the event type descriptions in the documentation will try to standarize most of the event types to use as much of the data as it is possible.
+
+The most  accurate approach seems to perform some checks for each of the 48 event types and try to find misspelings, or made up event types and see if we can fit as many of them in the documented event types.
 
 1. Astronomical Low Tide
-
 
 Check for event types using search pattern based on the start word astronomical or tide.
 
 ```{r}
 spattern = "[aA]str|ASTR|[Tt]ide|TIDE"
-etypes <- data %>%  filter(str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
-table(etypes)
+data %>%  filter(str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+
 ```
 
 Event type ASTRONAMICAL HIGH TIDE is not described in documentations but as of sectoin 7.4 it might be included in Coastal Flood event type. It will be done later on in this document. 
@@ -76,8 +88,10 @@ We will search form characters Ava, ava or AVA to try and find or references to 
 ```{r}
 event = "AVALANCHE"
 spattern = "[Aa]va|AVA"
-etypes <- data %>%  filter(str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
-table(etypes)
+data %>%  filter(str_detect(EVTYPE, spattern)) %>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 There are two divergent values that we will update to fit into the documented event avalanche, as EVTYPE = AVALANCHE
@@ -88,8 +102,10 @@ data[str_detect(data$EVTYPE,spattern),] <- data %>%filter(str_detect(EVTYPE,spat
 
 
 ```{r}
-etypes <- data %>%  filter(str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
-table(etypes)
+data %>%  filter(str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 3. Blizzard
@@ -99,8 +115,10 @@ Search for event types containing Bli, bli and BLI to be included in event type 
 ```{r}
 event = "BLIZZARD"
 spattern="[Bb]li|BLI"
-etypes <- data %>%  filter(str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
-table(etypes)
+data %>%  filter(str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 
@@ -110,8 +128,10 @@ So we will convert all of them to BLIZZARD.
 
 ```{r}
 data[str_detect(data$EVTYPE,spattern),] <- data %>%filter(str_detect(EVTYPE, spattern))%>% mutate(EVTYPE = event )
-etypes <-data %>%  filter(str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
-table(etypes)
+data %>%  filter(str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 4. Coastal Flood
@@ -121,10 +141,12 @@ Search for event types based on words coast and flood and include results in eve
 
 ```{r}
 event="COASTAL FLOOD"
-spattern ="[Cc]oast|COAST"
+spattern ="[Cc]oast|COAST|[cC]stl|CSTL"
 spattern2 = "[fF]lood|FLOOD"
-etypes <- data %>%  filter(str_detect(EVTYPE, spattern)& str_detect(EVTYPE, spattern2)) %>% select(EVTYPE)
-table(etypes)
+data %>%  filter(str_detect(EVTYPE, spattern)& str_detect(EVTYPE, spattern2)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 
 ```
 
@@ -133,15 +155,21 @@ New search patter will be based on coastal flood.
 
 ```{r}
 data[str_detect(data$EVTYPE, spattern)& str_detect(data$EVTYPE, spattern2) ,] <- data %>%filter( str_detect(EVTYPE, spattern)& str_detect(EVTYPE, spattern2))  %>% mutate(EVTYPE = event )
-etypes<- data %>%  filter( str_detect(EVTYPE, spattern)& str_detect(EVTYPE, spattern2)) %>% select(EVTYPE)
-table(etypes)
+
+data %>%  filter( str_detect(EVTYPE, spattern)& str_detect(EVTYPE, spattern2)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+
 ```
 
 To make sure we will check for the word coastal only.
 
 ```{r}
-etypes<- data %>%  filter(  str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
-table(etypes)
+data %>%  filter(  str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 
@@ -149,8 +177,11 @@ We will also add "COASTAL EROSION" and "COASTAL SURGE".
 
 ```{r}
 data[data$EVTYPE== "COASTAL EROSION"|data$EVTYPE == "COASTAL SURGE" ,] <- data %>%filter( EVTYPE== "COASTAL EROSION"|EVTYPE == "COASTAL SURGE")  %>% mutate(EVTYPE = event )
-etypes<- data %>%  filter(  str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
-table(etypes)
+data %>%  filter(  str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+
 ```
 
 
@@ -159,28 +190,36 @@ Also we already know that we need to include in this event type "ASTRONOMICAL HI
 
 ```{r}
 data[data$EVTYPE=="ASTRONOMICAL HIGH TIDE" ,] <- data %>%filter( EVTYPE=="ASTRONOMICAL HIGH TIDE")  %>% mutate(EVTYPE =event)
-etypes <- data %>%  filter(str_detect(EVTYPE, spattern)& str_detect(EVTYPE, spattern2)) %>% select(EVTYPE)
-table(etypes)
+data %>%  filter(str_detect(EVTYPE, spattern)& str_detect(EVTYPE, spattern2)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                   count(EVTYPE, name="Observations")
 ```
 
 5. Cold / Wind Chill
 
-Event type "COLD"
-Search for Chill, chill, CHILL, cold, Cold and COLD 
+Event type "COLD".
+Search for Chill, chill, CHILL, cold, Cold and COLD, and we will need to exclude word extreme, because there is another event type called extreme cold/wind chill. We will also exclude one cold air tornado.
 
 ```{r}
 event = "COLD"
 spattern =  "[Cc]old|COLD|[cC]hill|CHILL"
-etypes <- data %>%  filter(str_detect(EVTYPE,spattern)) %>% select(EVTYPE)
-table(etypes)
+spattern2 =  "EXTREME|[Ee]xtreme|TORNADO"
+data %>%  filter(str_detect(EVTYPE,spattern) & str_detect(EVTYPE,spattern2, negate = TRUE)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
+
 
 We will include all matchings in COLD event type.
 
 ```{r}
-data[str_detect(data$EVTYPE, spattern) ,] <- data %>%filter( str_detect(EVTYPE, spattern))  %>% mutate(EVTYPE =event )
-etypes <- data %>%  filter(str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
-table(etypes)
+data[str_detect(data$EVTYPE,spattern) & str_detect(data$EVTYPE,spattern2, negate = TRUE) ,] <- data %>%filter( str_detect(EVTYPE,spattern) & str_detect(EVTYPE,spattern2, negate = TRUE))  %>% mutate(EVTYPE =event )
+data %>%  filter(str_detect(EVTYPE,spattern) & str_detect(EVTYPE,spattern2, negate = TRUE)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 6. Debris Flow
@@ -190,8 +229,10 @@ The search patterns are based on the words debris, lahar, mud (for mudfall) and 
 ```{r}
 event="DEBRIS FLOW"
 spattern ="[Dd]ebris|DEBRIS|[Ll]ahar|LAHAR|[Mm]ud|MUD|[Vv]olcanic|VOLCANIC"
-etypes <- data %>%  filter(str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
-table(etypes)
+data %>%  filter(str_detect(EVTYPE, spattern)) %>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 We will exclude all volcanic related observations from this event type, they all will be included in VOLCANIC ASH.
@@ -199,8 +240,10 @@ We will exclude all volcanic related observations from this event type, they all
 ```{r}
 spattern ="[Dd]ebris|DEBRIS|[Ll]ahar|LAHAR|[Mm]ud|MUD"
 data[str_detect(data$EVTYPE, spattern) ,] <- data %>%filter( str_detect(EVTYPE, spattern))  %>% mutate(EVTYPE =event )
-etypes <- data %>%filter( str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
-table(etypes)
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 7. Dense Fog
@@ -209,8 +252,10 @@ table(etypes)
 ```{r}
 event ="DENSE FOG"
 spattern = "[Ff]og|FOG"
-etypes <- data %>%  filter(str_detect(EVTYPE,spattern))%>% select(EVTYPE)
-table(etypes)
+data %>%  filter(str_detect(EVTYPE,spattern))%>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 After search based on word fog event types "FOG" and "PATCHY DENSE FOG" will be included in "DENSE FOG", the rest belong to "FREEZING FOG" and will be standarized later.
@@ -218,14 +263,18 @@ After search based on word fog event types "FOG" and "PATCHY DENSE FOG" will be 
 
 ```{r}
 spattern="DENSE FOG|^FOG"
-etypes <- data %>%  filter(str_detect(EVTYPE,spattern ))%>% select(EVTYPE)
-table(etypes)
+data %>%  filter(str_detect(EVTYPE,spattern ))%>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 ```{r}
 data[str_detect(data$EVTYPE, spattern) ,] <- data %>%filter( str_detect(EVTYPE, spattern))  %>% mutate(EVTYPE =event )
-etypes <- data %>%filter( str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
-table(etypes)
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 8. Dense Smoke
@@ -235,14 +284,18 @@ Event types including word smoke, as usual lowercase and uppercase.
 ```{r}
 event ="DENSE SMOKE"
 spattern ="[Ss]moke|SMOKE"
-etypes <- data %>%  filter(str_detect(EVTYPE,spattern ))%>% select(EVTYPE)
-table(etypes)
+data %>%  filter(str_detect(EVTYPE,spattern ))%>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 ```{r}
 data[str_detect(data$EVTYPE, spattern) ,] <- data %>%filter( str_detect(EVTYPE,spattern))  %>% mutate(EVTYPE =event )
-etypes <- data %>%filter( str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
-table(etypes)
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 9. Drought
@@ -251,8 +304,10 @@ table(etypes)
 ```{r}
 event="DROUGHT"
 spattern = "[dD]rought|DROUGHT"
-etypes <- data %>%  filter(str_detect(EVTYPE, spattern ))%>% select(EVTYPE)
-table(etypes)
+data %>%  filter(str_detect(EVTYPE, spattern ))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 All event types with word drought are corsidered "DROUGHT" event type.
@@ -260,8 +315,10 @@ All event types with word drought are corsidered "DROUGHT" event type.
 
 ```{r}
 data[str_detect(data$EVTYPE, spattern) ,] <- data %>%filter( str_detect(EVTYPE,spattern))  %>% mutate(EVTYPE =event )
-etypes <- data %>%filter( str_detect(EVTYPE,spattern)) %>% select(EVTYPE)
-table(etypes)
+data %>%filter( str_detect(EVTYPE,spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 10. Dust Devil
@@ -269,8 +326,10 @@ table(etypes)
 ```{r}
 event ="DUST DEVIL"
 spattern = "[dD]ust|DUST|[Dd]evil|DEVIL"
-etypes <- data %>%  filter(str_detect(EVTYPE, spattern))%>% select(EVTYPE)
-table(etypes)
+data %>%  filter(str_detect(EVTYPE, spattern))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 As shown by search based on words dust and devil we will keep as "DUST DEVIL" only those including the word devil and devel, the rest seem to belong to "DUST STORM" event type.
@@ -278,15 +337,18 @@ As shown by search based on words dust and devil we will keep as "DUST DEVIL" on
 
 ```{r}
 spattern= "[Dd]evil|DEV[IE]L"
-etypes <- data %>%  filter(str_detect(EVTYPE, spattern))%>% select(EVTYPE)
-table(etypes)
+data %>%  filter(str_detect(EVTYPE, spattern))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
-
 
 ```{r}
 data[str_detect(data$EVTYPE, spattern) ,] <- data %>%filter( str_detect(EVTYPE, spattern))  %>% mutate(EVTYPE =event)
-etypes <- data %>%filter( str_detect(EVTYPE, spattern)) %>% select(EVTYPE)
-table(etypes)
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations") 
 ```
 
 11. Dust Storm
@@ -296,14 +358,541 @@ All event types including the word dust, except those including word devil.
 ```{r}
 event = "DUST STORM"
 spattern =  "[dD]ust|DUST"
-etypes <- data %>%  filter(str_detect(EVTYPE, spattern))%>% select(EVTYPE)
-table(etypes)
+data %>%  filter(str_detect(EVTYPE, spattern))%>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+We need to exclude "DUST DEVIL", all the rest will be assigned to "DUST STORM".
+
+```{r}
+spattern =  "[dD]ust|DUST"
+spattern2 = "DEVIL"
+data %>%  filter(str_detect(EVTYPE, spattern) & str_detect(EVTYPE, spattern2, negate = TRUE))%>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+
+```{r}
+data[str_detect(data$EVTYPE, spattern) & str_detect(data$EVTYPE, spattern2, negate = TRUE) ,] <- data %>%
+    filter( str_detect(EVTYPE, spattern)&str_detect(EVTYPE, spattern2, negate = TRUE))%>% 
+    mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+12. Excessive Heat
+
+We will proceed to the search based on word heat.
+
+```{r}
+event="EXCESSIVE HEAT"
+spattern =  "[Hh]eat|HEAT"
+
+data %>%  filter(str_detect(EVTYPE, spattern))%>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+We will keep in "EXCESSIVE HEAT" category only those which include word excessive or extreme, the rest will be included in even type "HEAT".
+
+```{r}
+spattern <-  "EX.* HEAT"
+
+data %>%  filter(str_detect(EVTYPE, spattern))%>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations") 
+   
+```
+
+
+```{r}
+data[str_detect(data$EVTYPE, spattern),] <- data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                                                    mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+13. Extreme Cold
+
+Search pattern based on extreme, cold and wind chill
+
+```{r}
+event="EXTREME COLD"
+spattern =  "([Ee]xtreme|EXTREME) ([cC]old|COLD|[Cc]hill|CHILL|WIND)"
+data %>%  filter(str_detect(EVTYPE, spattern))%>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+
+
+```{r}
+data[str_detect(data$EVTYPE, spattern),] <- data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                                                    mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+14. Flash Flood
+
+We will start adding to the catergorie all event types including words flash and flood. 
+```{r}
+event="FLASH FLOOD"
+spattern =  "(FLASH|[fF]lash) ([fF]lood|FLOOD)"
+
+data %>%  filter(str_detect(EVTYPE, spattern))%>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+```{r}
+data[str_detect(data$EVTYPE, spattern),] <- data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                                                    mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+Also in different order.
+
+```{r}
+
+spattern =  "([fF]lood|FLOOD)(.*)(FLASH|[Ff]lash)"
+
+etypes <- data %>%  filter(str_detect(EVTYPE, spattern))%>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+```{r}
+data[str_detect(data$EVTYPE, spattern),] <- data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                                                    mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+15. Flood
+
+All event type including the word flood, except flash flood,lakeshore flood and coastal flood will be included in "FLOOD".
+bv     
+```{r}
+event="FLOOD"
+spattern =  "([fF]lood|FLOOD)"
+spattern2 = "[Ll]acke|LAKE|COASTAL|FLASH"
+
+data %>%  filter(str_detect(EVTYPE, spattern) & str_detect(EVTYPE,spattern2, negate = TRUE))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+
+```{r}
+data[str_detect(data$EVTYPE, spattern) & str_detect(data$EVTYPE,spattern2, negate = TRUE),] <- data %>%
+     filter( str_detect(EVTYPE, spattern) & str_detect(EVTYPE,spattern2, negate = TRUE)) %>% 
+     mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern) & str_detect(EVTYPE,spattern2, negate = TRUE)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+16. Freezing Fog
+
+```{r}
+event="FREEZING FOG"
+spattern =  "([fF]reezing|FREEZING)(.*)([Ff]og|FOG)"
+
+data %>%  filter(str_detect(EVTYPE, spattern) )%>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+```{r}
+data[str_detect(data$EVTYPE, spattern),] <- data %>%filter( str_detect(EVTYPE, spattern)) %>%
+                                                    mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+17. Frost/freeze
+
+All reference to frost or freeze or freezing are included in event type "FROST" except for "FREEZING FOG".
+
+```{r}
+event="FROST"
+spattern =  "([fF]rost|FROST|[Ff]ree|FREE)"
+spattern2 = "FOG"
+
+data %>%  filter(str_detect(EVTYPE, spattern) & str_detect(EVTYPE, spattern2, negate =TRUE)  )%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+```{r}
+data[str_detect(data$EVTYPE, spattern) & str_detect(data$EVTYPE,spattern2, negate = TRUE),] <- data %>%
+     filter( str_detect(EVTYPE, spattern) & str_detect(EVTYPE,spattern2, negate = TRUE)) %>% 
+     mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern) & str_detect(EVTYPE,spattern2, negate = TRUE)) %>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+18. Funnel Cloud
+
+All event types containing word funnel are included in "FUNNEL cLOUD"
+
+```{r}
+event="FUNNEL CLOUD"
+spattern =  "([fF]unnel|FUNNEL)"
+
+data %>%  filter(str_detect(EVTYPE, spattern) )%>% arrange(EVTYPE) %>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+```{r}
+data[str_detect(data$EVTYPE, spattern),] <- data %>%filter( str_detect(EVTYPE, spattern)) %>%
+                                                    mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+19. Hail
+
+All event types containing word hail are included in "HAIL", except marine hail.
+
+```{r}
+event="HAIL"
+spattern =  "[hH]ail|HAIL"
+spattern2 = "MARINE|[Mm]arine"
+databckp %>%  filter(str_detect(EVTYPE, spattern) & str_detect(EVTYPE, spattern2, negate = TRUE) )%>%
+                    arrange(EVTYPE) %>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+```{r}
+data[str_detect(data$EVTYPE, spattern) & str_detect(data$EVTYPE, spattern2, negate = TRUE),] <- data %>%
+                    filter( str_detect(EVTYPE, spattern) & str_detect(EVTYPE, spattern2, negate = TRUE)) %>%
+                    mutate(EVTYPE =event)
+
+etypes <- data %>%filter( str_detect(EVTYPE, spattern) & str_detect(EVTYPE, spattern2, negate = TRUE)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+20. Heat
+
+All event types containing word heat are included in "HEAT" except excessive heat.
+
+```{r}
+event="HEAT"
+spattern =  "[hH]eat|HEAT"
+spattern2 = "EXCESSIVE"
+
+data %>%  filter(str_detect(EVTYPE, spattern) & str_detect(EVTYPE,spattern2, negate = TRUE))%>%                                  group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+
+```
+
+```{r}
+data[str_detect(data$EVTYPE, spattern) & str_detect(data$EVTYPE,spattern2, negate = TRUE),] <- data %>%
+     filter( str_detect(EVTYPE, spattern) & str_detect(EVTYPE,spattern2, negate = TRUE)) %>% 
+     mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern) & str_detect(EVTYPE,spattern2, negate = TRUE)) %>%
+                      group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+21. Heavy Rain
+
+All event types containing word rain can be considered a "HEAVY RAIN" phenomena, specially beacause it has cause damage or injuries.  
+
+```{r}
+event="HEAVY RAIN"
+spattern =  "[rR]ain|RAIN"
+etypes <- data %>%  filter(str_detect(EVTYPE, spattern))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+etypes
+```
+
+```{r}
+data[str_detect(data$EVTYPE, spattern),] <- data %>%filter( str_detect(EVTYPE, spattern)) %>%
+                                                    mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+22. Heavy Snow
+
+
+All event types containing word snow can be considered a "HEAVY SNOW" phenomena. Except lake-effect snow.
+
+```{r}
+event="HEAVY SNOW"
+spattern =  "[Ss]now|SNOW"
+spattern2 = "LAKE"
+data %>%  filter(str_detect(EVTYPE, spattern) & str_detect(EVTYPE, spattern2, negate = TRUE))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+
+```{r}
+data[str_detect(data$EVTYPE, spattern) & str_detect(data$EVTYPE, spattern2, negate = TRUE),] <- data %>%
+                  filter( str_detect(EVTYPE, spattern) & str_detect(EVTYPE, spattern2, negate = TRUE)) %>%
+                  mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern) & str_detect(EVTYPE, spattern2, negate = TRUE)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
 ```
 
 23. High Surf
 
+All event types containing word surf can be considered a "HIGH SURF" phenomena.
+
+```{r}
+event="HIGH SURF"
+spattern =  "[Ss]urf|SURF"
+data %>%  filter(str_detect(EVTYPE, spattern))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
 
 
+```{r}
+data[str_detect(data$EVTYPE, spattern),] <- data %>%filter( str_detect(EVTYPE, spattern)) %>%
+                                                    mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+
+24. High Wind
+
+
+All event types containing word wind can be considered a "HIGH WIND" phenomena, except those associated to thunderstorms.
+
+```{r}
+event="HIGH WIND"
+spattern =  "[wW]ind|WIND"
+data %>%  filter(str_detect(EVTYPE, spattern))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+As there are several combinations we will do it in several steps. Frist "NON-TSTM WIND"
+
+```{r}
+spattern =  "(NON)(.*)(TSTM)(.*)([wW]ind|WIND)"
+data %>%  filter(str_detect(EVTYPE, spattern))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+
+data[str_detect(data$EVTYPE, spattern),] <- data %>%filter( str_detect(EVTYPE, spattern)) %>%
+                                                    mutate(EVTYPE =event)
+
+
+```
+
+
+Now the rest of wind observations not related to thunderstorms.
+
+
+```{r}
+spattern =  "[wW]ind|WIND"
+spattern2 = "TSTM|[tT]stm|THUNDERSTORM|[tT]hunderstorm|TUNDERSTORM|[tT]understorm"
+data %>%  filter(str_detect(EVTYPE, spattern) & str_detect(EVTYPE, spattern2, negate = TRUE))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+
+data[str_detect(data$EVTYPE, spattern) & str_detect(data$EVTYPE, spattern2, negate = TRUE),] <- data %>%
+                    filter( str_detect(EVTYPE, spattern) & str_detect(EVTYPE, spattern2, negate = TRUE)) %>%
+                    mutate(EVTYPE =event)
+
+
+```
+
+
+25. Hurricane/Typhoon
+
+```{r}
+event="HURRICANE"
+spattern =  "[hH]urricane|HURRICANE|TYPHOON|[Tt]yphoon"
+data %>%  filter(str_detect(EVTYPE, spattern))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+```{r}
+data[str_detect(data$EVTYPE, spattern),] <- data %>%filter( str_detect(EVTYPE, spattern)) %>%
+                                                    mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+26. Ice Storm
+
+```{r}
+event="ICE STORM"
+spattern =  "ICE|[Ii]ce"
+data %>%  filter(str_detect(EVTYPE, spattern))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+
+```{r}
+data[str_detect(data$EVTYPE, spattern),] <- data %>%filter( str_detect(EVTYPE, spattern)) %>%
+                                                    mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+27. Lakeshore Flood
+
+
+
+```{r}
+event="LAKESHORE FLOOD"
+spattern =  "(LAKE|[Ll]ake)(.*)(FLOOD)"
+data %>%  filter(str_detect(EVTYPE, spattern))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+```{r}
+data[str_detect(data$EVTYPE, spattern),] <- data %>%filter( str_detect(EVTYPE, spattern)) %>%
+                                                    mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+
+28. Lake-Effect Snow
+
+
+```{r}
+event="LAKE-EFFECT SNOW"
+spattern =  "(LAKE|[Ll]ake)(.*)(SNOW|[Ss]now)"
+data %>%  filter(str_detect(EVTYPE, spattern))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+
+```{r}
+data[str_detect(data$EVTYPE, spattern),] <- data %>%filter( str_detect(EVTYPE, spattern)) %>%
+                                                    mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+
+29. Lightning
+
+
+
+```{r}
+event="LIGHTNING"
+spattern =  "LIGHT|[lL]ight"
+
+data %>%  filter(str_detect(EVTYPE, spattern))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+
+```{r}
+data[str_detect(data$EVTYPE, spattern),] <- data %>%filter( str_detect(EVTYPE, spattern)) %>%
+                                                    mutate(EVTYPE =event)
+
+data %>%filter( str_detect(EVTYPE, spattern)) %>% 
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
+
+30. Marine Hail
+
+
+
+```{r}
+event="MARINE HAIL"
+spattern =  "(MARINE|[mM]arine)(.*)(HAIL|[Hh]ail)"
+
+data %>%  filter(str_detect(EVTYPE, spattern))%>%
+                    group_by(EVTYPE) %>% 
+                    arrange(EVTYPE) %>%
+                    count(EVTYPE, name="Observations")
+```
 
 Create new columns with the actual amount of property and crop damage by multiplyng by the manigitude (PROPDMEXP,CROPDMEXP)
 being magnitud K thousands, M millions and B billions as explained in [National Weather Service Instructions](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
@@ -312,3 +901,30 @@ being magnitud K thousands, M millions and B billions as explained in [National 
 
 
 ## Results
+
+
+function.exptonum = function(x){  case_when(x=="K"~1000, x=="M"~1000000, x=="B"~1000000000) }
+
+
+
+
+EventsDmg <- data %>% group_by(EVTYPE) %>%
+            mutate(num_propdmgexp = function.exptonum(PROPDMGEXP),
+              property_damage = PROPDMG * num_propdmgexp,
+              num_cropdmgexp = function.exptonum(CROPDMGEXP),
+              crop_damage = CROPDMG * num_cropdmgexp) %>%
+            summarise(sum(property_damage),sum(crop_damage))
+            
+names(EventsDmg) <- c("EVENT_TYPE", "PROPERTY_DAMAGE", "CROP_DAMAGE")
+
+EventsDmg %>% arrange(desc(PROPERTY_DAMAGE))
+
+EventsVictims <- data %>% group_by(EVTYPE) %>%
+                 summarise(sum(FATALITIES),sum(INJURIES))
+                 
+names(EventsVictims) = c("EVENT_TYPE","FATALITIES", "INJURIES")
+
+
+EventsVictims %>% arrange(desc(FATALITIES))
+
+EventsVictims %>% arrange(desc(INJURIESS))
